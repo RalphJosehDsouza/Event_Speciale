@@ -2,6 +2,8 @@ from pydantic import BaseModel, Field
 from typing import List, Optional
 from datetime import datetime
 from enum import Enum
+from bson import ObjectId
+from .config import PaymentStatus
 
 class CouncilType(str, Enum):
     ROTARACT = "rotaract"
@@ -18,8 +20,23 @@ class EventType(str, Enum):
     CULTURAL = "cultural"
     RETREAT = "retreat"
 
+class PyObjectId(ObjectId):
+    @classmethod
+    def __get_validators__(cls):
+        yield cls.validate
+
+    @classmethod
+    def validate(cls, v):
+        if not ObjectId.is_valid(v):
+            raise ValueError("Invalid ObjectId")
+        return ObjectId(v)
+
+    @classmethod
+    def __get_pydantic_json_schema__(cls, field_schema):
+        field_schema.update(type="string")
+
 class Event(BaseModel):
-    id: str = Field(..., description="Unique identifier for the event")
+    id: PyObjectId = Field(default_factory=PyObjectId, alias="_id")
     title: str = Field(..., description="Title of the event")
     description: str = Field(..., description="Detailed description of the event")
     council: CouncilType = Field(..., description="Council organizing the event")
@@ -28,12 +45,12 @@ class Event(BaseModel):
     location: str = Field(..., description="Venue of the event")
     registration_deadline: datetime = Field(..., description="Last date for registration")
     image_url: Optional[str] = Field(None, description="URL of the event image")
-    registration_fee: Optional[float] = Field(None, description="Registration fee if any")
+    registration_fee: float
     max_participants: Optional[int] = Field(None, description="Maximum number of participants")
     rules: Optional[List[str]] = Field([], description="List of rules for the event")
     prizes: Optional[List[str]] = Field([], description="List of prizes for the event")
     contact_email: str = Field(..., description="Contact email for event queries")
-    contact_phone: Optional[str] = Field(None, description="Contact phone number")
+    contact_phone: str = Field(..., description="Contact phone number")
     sponsors: Optional[List[str]] = Field([], description="List of event sponsors")
     itinerary: Optional[List[dict]] = Field(None, description="Detailed schedule of the event")
     inclusions: Optional[List[str]] = Field([], description="What's included in the registration")
@@ -41,22 +58,51 @@ class Event(BaseModel):
     terms_conditions: Optional[List[str]] = Field([], description="Terms and conditions")
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
+    club: str
+    is_active: bool = True
+
+    class Config:
+        allow_population_by_field_name = True
+        arbitrary_types_allowed = True
+        json_encoders = {ObjectId: str}
+
+class PaymentDetails(BaseModel):
+    order_id: Optional[str] = None
+    payment_id: Optional[str] = None
+    signature: Optional[str] = None
+    amount: float
+    currency: str = "INR"
+    status: str = PaymentStatus.PENDING
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
 
 class Registration(BaseModel):
-    id: str = Field(..., description="Unique identifier for the registration")
-    event_id: str = Field(..., description="ID of the event being registered for")
-    student_name: str = Field(..., description="Name of the student")
-    roll_number: str = Field(..., description="Roll number of the student")
+    id: PyObjectId = Field(default_factory=PyObjectId, alias="_id")
+    event_id: PyObjectId
+    name: str = Field(..., description="Name of the student")
     email: str = Field(..., description="Email address of the student")
     phone: str = Field(..., description="Phone number of the student")
-    department: str = Field(..., description="Department of the student")
+    college: str = Field(..., description="Department of the student")
     year: str = Field(..., description="Year of study")
-    team_name: Optional[str] = Field(None, description="Name of the team (if applicable)")
-    team_members: Optional[List[str]] = Field([], description="List of team members (if applicable)")
+    branch: str = Field(..., description="Roll number of the student")
     registration_date: datetime = Field(default_factory=datetime.utcnow)
-    payment_status: str = Field("pending", description="Status of payment")
-    amount_paid: Optional[float] = Field(None, description="Amount paid for registration")
-    status: str = Field("pending", description="Status of the registration (pending/approved/rejected)")
+    payment: PaymentDetails
+    status: str = "pending"  # pending, confirmed, cancelled
+    additional_info: Optional[dict] = None
+
+    class Config:
+        allow_population_by_field_name = True
+        arbitrary_types_allowed = True
+        json_encoders = {ObjectId: str}
+
+class RegistrationCreate(BaseModel):
+    name: str
+    email: str
+    phone: str
+    college: str
+    year: str
+    branch: str
+    additional_info: Optional[dict] = None
 
 # Sample event data for each council
 sample_events = [

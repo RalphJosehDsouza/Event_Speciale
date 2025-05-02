@@ -21,19 +21,78 @@ import {
   Radio,
   RadioGroup,
   FormLabel,
-  Divider,
 } from '@mui/material';
+import axios from 'axios';
+
+const EVENT_DATA = {
+  'tedx-spectrum-2025': {
+    id: 'tedx-spectrum-2025',
+    title: 'TEDxCRCE 2025: Beyond the Spectrum',
+    event_type: 'CONFERENCE',
+    registration_fee: 500,
+  },
+  'bitnbuild-2024': {
+    id: 'bitnbuild-2024',
+    title: 'Bit N Build: Maharashtra Round',
+    event_type: 'HACKATHON',
+    registration_fee: 200,
+  },
+  'heart-and-sole-2024': {
+    id: 'heart-and-sole-2024',
+    title: 'The Heart & Sole Run 2025',
+    event_type: 'SPORTS',
+    registration_fee: 500,
+  },
+  'footslog-2024': {
+    id: 'footslog-2024',
+    title: 'Footslog: Kothaligad Trek',
+    event_type: 'RETREAT',
+    registration_fee: 800,
+  },
+  'athlead-2024': {
+    id: 'athlead-2024',
+    title: 'Athlead 2024',
+    event_type: 'SPORTS',
+    registration_fee: 100,
+  },
+  'crmd-2024': {
+    id: 'crmd-2024',
+    title: 'CRMD 2024: Maze of Conflict',
+    event_type: 'TECHNICAL',
+    registration_fee: 300,
+  },
+  'unplug-2024': {
+    id: 'unplug-2024',
+    title: 'Unplug: By The Beach',
+    event_type: 'RETREAT',
+    registration_fee: 200,
+  },
+  'hackx-2024': {
+    id: 'hackx-2024',
+    title: 'HackX: AI Innovation Challenge',
+    event_type: 'HACKATHON',
+    registration_fee: 300,
+  },
+  'codequest-2024': {
+    id: 'codequest-2024',
+    title: 'CodeQuest 2024',
+    event_type: 'HACKATHON',
+    registration_fee: 250,
+  }
+};
 
 const Register = () => {
   const { eventId } = useParams();
   const navigate = useNavigate();
-  const [event, setEvent] = useState(null);
+  const [event, setEvent] = useState(EVENT_DATA[eventId] || null);
+  const [error, setError] = useState('');
   const [activeStep, setActiveStep] = useState(0);
   const [formData, setFormData] = useState({
     personalInfo: {
       name: '',
       email: '',
       phone: '',
+      age: '',
       college: '',
       year: '',
       branch: '',
@@ -44,37 +103,72 @@ const Register = () => {
       agreed: false,
     },
   });
-  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    fetch(`http://localhost:8000/events/${eventId}`)
-      .then(response => response.json())
-      .then(data => {
+    const initializeEvent = async () => {
+      try {
+        if (!event) {
+          const response = await fetch(`http://localhost:8000/events/${eventId}`);
+          if (!response.ok) {
+            throw new Error('Failed to fetch event details');
+          }
+          const data = await response.json();
         setEvent(data);
-        // Initialize event-specific fields based on event type
+        }
+        
         const specificFields = {};
-        if (data.event_type === 'RETREAT') {
+        if (event?.event_type === 'RETREAT') {
           specificFields.roomPreference = '';
           specificFields.dietaryRestrictions = '';
           specificFields.emergencyContact = '';
-        } else if (data.event_type === 'CONFERENCE') {
+        } else if (event?.event_type === 'CONFERENCE') {
           specificFields.tShirtSize = '';
           specificFields.foodPreference = '';
+        } else if (event?.event_type === 'HACKATHON') {
+          specificFields.teamName = '';
+          specificFields.teamSize = '';
+          specificFields.projectIdea = '';
+          specificFields.techStack = '';
+        } else if (event?.event_type === 'SPORTS') {
+          specificFields.category = '';
+          specificFields.tShirtSize = '';
+          specificFields.emergencyContact = '';
         }
+        
         setFormData(prev => ({
           ...prev,
           eventSpecific: specificFields,
         }));
-      })
-      .catch(error => {
-        console.error('Error fetching event:', error);
-        setError('Failed to load event details');
-      });
-  }, [eventId]);
+      } catch (err) {
+        setError(err.message || 'Failed to load event details');
+      }
+    };
 
-  const steps = ['Personal Information', 'Event Details', 'Payment'];
+    if (eventId) {
+      initializeEvent();
+    }
+  }, [eventId, event]);
+
+  useEffect(() => {
+    const script = document.createElement('script');
+    script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+    script.async = true;
+    document.body.appendChild(script);
+    return () => {
+      document.body.removeChild(script);
+    };
+  }, []);
 
   const handleChange = (section, field) => (event) => {
+    if (field === 'age') {
+      const age = parseInt(event.target.value);
+      if (age < 16 || age > 30) {
+        setError('Age must be between 16 and 30 years');
+        return;
+      }
+      setError('');
+    }
     setFormData(prev => ({
       ...prev,
       [section]: {
@@ -92,41 +186,81 @@ const Register = () => {
     setActiveStep(prev => prev - 1);
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    try {
-      const response = await fetch('http://localhost:8000/register', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          eventId,
-          ...formData,
-        }),
-      });
-      
-      if (response.ok) {
-        navigate(`/registration-success/${eventId}`);
-      } else {
-        const data = await response.json();
-        setError(data.message || 'Registration failed');
+  const initializePayment = async (orderId) => {
+    const options = {
+      key: process.env.REACT_APP_RAZORPAY_KEY_ID,
+      amount: event.registration_fee * 100,
+      currency: 'INR',
+      name: 'FRCRCE Events',
+      description: `Registration for ${event.title}`,
+      order_id: orderId,
+      handler: async (response) => {
+        try {
+          const { data } = await axios.post('/api/payments/verify', {
+            razorpay_payment_id: response.razorpay_payment_id,
+            razorpay_order_id: response.razorpay_order_id,
+            razorpay_signature: response.razorpay_signature,
+            registration_id: orderId
+          });
+          if (data.success) {
+            navigate('/registration-success', { 
+              state: { 
+                eventTitle: event.title,
+                paymentId: response.razorpay_payment_id 
+              }
+            });
+          }
+        } catch (error) {
+          setError('Payment verification failed. Please contact support.');
+          setLoading(false);
+        }
+      },
+      prefill: {
+        name: formData.personalInfo.name,
+        email: formData.personalInfo.email,
+        contact: formData.personalInfo.phone
+      },
+      theme: {
+        color: '#3f51b5'
       }
-    } catch (error) {
-      setError('Failed to submit registration');
-    }
+    };
+    const razorpayInstance = new window.Razorpay(options);
+    razorpayInstance.open();
   };
 
-  if (!event) {
-    return (
-      <Container>
-        <Typography variant="h4">Loading registration form...</Typography>
-      </Container>
-    );
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
+
+    try {
+      const registrationData = {
+        eventId: event._id,
+        personalInfo: formData.personalInfo,
+        eventSpecific: formData.eventSpecific
+      };
+
+      const { data: registration } = await axios.post('/api/registrations', registrationData);
+      const { data: paymentOrder } = await axios.post('/api/payments/create', {
+        registrationId: registration._id,
+        amount: event.registration_fee
+      });
+
+      await initializePayment(paymentOrder.id);
+    } catch (error) {
+      setError(error.response?.data?.message || 'Registration failed. Please try again.');
+      setLoading(false);
   }
+  };
 
   const renderPersonalInfo = () => (
     <Grid container spacing={3}>
+      <Grid item xs={12}>
+        <Typography variant="h6" gutterBottom>
+          Personal Information
+        </Typography>
+      </Grid>
+
       <Grid item xs={12} sm={6}>
         <TextField
           required
@@ -136,6 +270,7 @@ const Register = () => {
           onChange={handleChange('personalInfo', 'name')}
         />
       </Grid>
+
       <Grid item xs={12} sm={6}>
         <TextField
           required
@@ -146,6 +281,7 @@ const Register = () => {
           onChange={handleChange('personalInfo', 'email')}
         />
       </Grid>
+
       <Grid item xs={12} sm={6}>
         <TextField
           required
@@ -155,6 +291,21 @@ const Register = () => {
           onChange={handleChange('personalInfo', 'phone')}
         />
       </Grid>
+
+      <Grid item xs={12} sm={6}>
+        <TextField
+          required
+          fullWidth
+          label="Age"
+          type="number"
+          inputProps={{ min: 16, max: 30 }}
+          value={formData.personalInfo.age}
+          onChange={handleChange('personalInfo', 'age')}
+          error={error.includes('Age must be')}
+          helperText={error.includes('Age must be') ? error : ''}
+        />
+      </Grid>
+
       <Grid item xs={12} sm={6}>
         <TextField
           required
@@ -164,6 +315,7 @@ const Register = () => {
           onChange={handleChange('personalInfo', 'college')}
         />
       </Grid>
+
       <Grid item xs={12} sm={6}>
         <FormControl fullWidth required>
           <InputLabel>Year</InputLabel>
@@ -179,6 +331,7 @@ const Register = () => {
           </Select>
         </FormControl>
       </Grid>
+
       <Grid item xs={12} sm={6}>
         <FormControl fullWidth required>
           <InputLabel>Branch</InputLabel>
@@ -198,32 +351,49 @@ const Register = () => {
   );
 
   const renderEventSpecific = () => {
-    if (event.event_type === 'RETREAT') {
+    if (!event) return null;
+
+    switch (event.event_type) {
+      case 'RETREAT':
       return (
         <Grid container spacing={3}>
           <Grid item xs={12}>
-            <FormControl fullWidth>
-              <FormLabel>Room Preference</FormLabel>
-              <RadioGroup
+              <Typography variant="h6" gutterBottom>
+                Retreat Details
+              </Typography>
+            </Grid>
+
+            <Grid item xs={12} sm={6}>
+              <FormControl fullWidth required>
+                <InputLabel>Room Preference</InputLabel>
+                <Select
                 value={formData.eventSpecific.roomPreference}
                 onChange={handleChange('eventSpecific', 'roomPreference')}
-              >
-                <FormControlLabel value="single" control={<Radio />} label="Single Occupancy" />
-                <FormControlLabel value="double" control={<Radio />} label="Double Occupancy" />
-                <FormControlLabel value="triple" control={<Radio />} label="Triple Occupancy" />
-              </RadioGroup>
+                  label="Room Preference"
+                >
+                  <MenuItem value="single">Single Room</MenuItem>
+                  <MenuItem value="double">Double Room</MenuItem>
+                  <MenuItem value="dorm">Dormitory</MenuItem>
+                </Select>
             </FormControl>
           </Grid>
-          <Grid item xs={12}>
-            <TextField
-              fullWidth
-              label="Dietary Restrictions"
-              multiline
-              rows={2}
+
+            <Grid item xs={12} sm={6}>
+              <FormControl fullWidth required>
+                <InputLabel>Dietary Restrictions</InputLabel>
+                <Select
               value={formData.eventSpecific.dietaryRestrictions}
               onChange={handleChange('eventSpecific', 'dietaryRestrictions')}
-            />
+                  label="Dietary Restrictions"
+                >
+                  <MenuItem value="none">None</MenuItem>
+                  <MenuItem value="vegetarian">Vegetarian</MenuItem>
+                  <MenuItem value="vegan">Vegan</MenuItem>
+                  <MenuItem value="gluten-free">Gluten Free</MenuItem>
+                </Select>
+              </FormControl>
           </Grid>
+
           <Grid item xs={12}>
             <TextField
               required
@@ -235,9 +405,16 @@ const Register = () => {
           </Grid>
         </Grid>
       );
-    } else if (event.event_type === 'CONFERENCE') {
+
+      case 'CONFERENCE':
       return (
         <Grid container spacing={3}>
+            <Grid item xs={12}>
+              <Typography variant="h6" gutterBottom>
+                Conference Details
+              </Typography>
+            </Grid>
+
           <Grid item xs={12} sm={6}>
             <FormControl fullWidth required>
               <InputLabel>T-Shirt Size</InputLabel>
@@ -246,13 +423,16 @@ const Register = () => {
                 onChange={handleChange('eventSpecific', 'tShirtSize')}
                 label="T-Shirt Size"
               >
-                <MenuItem value="S">Small</MenuItem>
-                <MenuItem value="M">Medium</MenuItem>
-                <MenuItem value="L">Large</MenuItem>
-                <MenuItem value="XL">Extra Large</MenuItem>
+                  <MenuItem value="XS">XS</MenuItem>
+                  <MenuItem value="S">S</MenuItem>
+                  <MenuItem value="M">M</MenuItem>
+                  <MenuItem value="L">L</MenuItem>
+                  <MenuItem value="XL">XL</MenuItem>
+                  <MenuItem value="XXL">XXL</MenuItem>
               </Select>
             </FormControl>
           </Grid>
+
           <Grid item xs={12} sm={6}>
             <FormControl fullWidth required>
               <InputLabel>Food Preference</InputLabel>
@@ -261,60 +441,170 @@ const Register = () => {
                 onChange={handleChange('eventSpecific', 'foodPreference')}
                 label="Food Preference"
               >
-                <MenuItem value="veg">Vegetarian</MenuItem>
-                <MenuItem value="nonveg">Non-Vegetarian</MenuItem>
-                <MenuItem value="jain">Jain</MenuItem>
+                  <MenuItem value="vegetarian">Vegetarian</MenuItem>
+                  <MenuItem value="non-vegetarian">Non-Vegetarian</MenuItem>
               </Select>
             </FormControl>
           </Grid>
         </Grid>
       );
+
+      case 'HACKATHON':
+        return (
+          <Grid container spacing={3}>
+            <Grid item xs={12}>
+              <Typography variant="h6" gutterBottom>
+                Team Details
+              </Typography>
+            </Grid>
+
+            <Grid item xs={12} sm={6}>
+              <TextField
+                required
+                fullWidth
+                label="Team Name"
+                value={formData.eventSpecific.teamName}
+                onChange={handleChange('eventSpecific', 'teamName')}
+              />
+            </Grid>
+
+            <Grid item xs={12} sm={6}>
+              <FormControl fullWidth required>
+                <InputLabel>Team Size</InputLabel>
+                <Select
+                  value={formData.eventSpecific.teamSize}
+                  onChange={handleChange('eventSpecific', 'teamSize')}
+                  label="Team Size"
+                >
+                  <MenuItem value="1">1</MenuItem>
+                  <MenuItem value="2">2</MenuItem>
+                  <MenuItem value="3">3</MenuItem>
+                  <MenuItem value="4">4</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+
+            <Grid item xs={12}>
+              <TextField
+                required
+                fullWidth
+                label="Project Idea"
+                multiline
+                rows={3}
+                value={formData.eventSpecific.projectIdea}
+                onChange={handleChange('eventSpecific', 'projectIdea')}
+              />
+            </Grid>
+
+            <Grid item xs={12}>
+              <TextField
+                required
+                fullWidth
+                label="Tech Stack"
+                value={formData.eventSpecific.techStack}
+                onChange={handleChange('eventSpecific', 'techStack')}
+                placeholder="e.g., React, Node.js, MongoDB"
+              />
+            </Grid>
+          </Grid>
+        );
+
+      case 'SPORTS':
+        return (
+          <Grid container spacing={3}>
+            <Grid item xs={12}>
+              <Typography variant="h6" gutterBottom>
+                Sports Details
+              </Typography>
+            </Grid>
+
+            <Grid item xs={12} sm={6}>
+              <FormControl fullWidth required>
+                <InputLabel>Category</InputLabel>
+                <Select
+                  value={formData.eventSpecific.category}
+                  onChange={handleChange('eventSpecific', 'category')}
+                  label="Category"
+                >
+                  <MenuItem value="individual">Individual</MenuItem>
+                  <MenuItem value="team">Team</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+
+            <Grid item xs={12} sm={6}>
+              <FormControl fullWidth required>
+                <InputLabel>T-Shirt Size</InputLabel>
+                <Select
+                  value={formData.eventSpecific.tShirtSize}
+                  onChange={handleChange('eventSpecific', 'tShirtSize')}
+                  label="T-Shirt Size"
+                >
+                  <MenuItem value="XS">XS</MenuItem>
+                  <MenuItem value="S">S</MenuItem>
+                  <MenuItem value="M">M</MenuItem>
+                  <MenuItem value="L">L</MenuItem>
+                  <MenuItem value="XL">XL</MenuItem>
+                  <MenuItem value="XXL">XXL</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+
+            <Grid item xs={12}>
+              <TextField
+                required
+                fullWidth
+                label="Emergency Contact"
+                value={formData.eventSpecific.emergencyContact}
+                onChange={handleChange('eventSpecific', 'emergencyContact')}
+              />
+            </Grid>
+          </Grid>
+        );
+
+      default:
+        return null;
     }
-    return null;
   };
 
   const renderPayment = () => (
     <Grid container spacing={3}>
       <Grid item xs={12}>
         <Typography variant="h6" gutterBottom>
-          Registration Fee: ₹{event.registration_fee}
+          Payment Details
         </Typography>
-        {event.special_offers && (
-          <>
-            <Typography variant="subtitle1" gutterBottom>
-              Special Offers:
-            </Typography>
-            <ul>
-              {event.special_offers.map((offer, index) => (
-                <li key={index}>{offer}</li>
-              ))}
-            </ul>
-          </>
-        )}
       </Grid>
+
       <Grid item xs={12}>
-        <FormControl fullWidth required>
-          <InputLabel>Payment Method</InputLabel>
-          <Select
+        <Typography variant="body1" gutterBottom>
+          Registration Fee: ₹{event?.registration_fee || 0}
+            </Typography>
+      </Grid>
+
+      <Grid item xs={12}>
+        <FormControl component="fieldset">
+          <FormLabel component="legend">Payment Method</FormLabel>
+          <RadioGroup
             value={formData.payment.method}
             onChange={handleChange('payment', 'method')}
-            label="Payment Method"
           >
-            <MenuItem value="upi">UPI</MenuItem>
-            <MenuItem value="netbanking">Net Banking</MenuItem>
-            <MenuItem value="card">Credit/Debit Card</MenuItem>
-          </Select>
+            <FormControlLabel value="upi" control={<Radio />} label="UPI" />
+            <FormControlLabel value="netbanking" control={<Radio />} label="Net Banking" />
+            <FormControlLabel value="card" control={<Radio />} label="Credit/Debit Card" />
+          </RadioGroup>
         </FormControl>
       </Grid>
+
       <Grid item xs={12}>
         <FormControlLabel
           control={
             <Checkbox
               checked={formData.payment.agreed}
               onChange={handleChange('payment', 'agreed')}
+              color="primary"
             />
           }
-          label="I agree to the terms and conditions"
+          label="I agree to the terms and conditions and confirm that all information provided is accurate"
         />
       </Grid>
     </Grid>
@@ -329,7 +619,7 @@ const Register = () => {
       case 2:
         return renderPayment();
       default:
-        return 'Unknown step';
+        return null;
     }
   };
 
@@ -337,16 +627,8 @@ const Register = () => {
     <Container maxWidth="md" sx={{ py: 4 }}>
       <Paper elevation={3} sx={{ p: 4 }}>
         <Typography variant="h4" gutterBottom align="center">
-          Register for {event.title}
+          Register for {event?.title || 'Event'}
         </Typography>
-        
-        <Stepper activeStep={activeStep} sx={{ py: 4 }}>
-          {steps.map((label) => (
-            <Step key={label}>
-              <StepLabel>{label}</StepLabel>
-            </Step>
-          ))}
-        </Stepper>
 
         {error && (
           <Alert severity="error" sx={{ mb: 2 }}>
@@ -354,32 +636,48 @@ const Register = () => {
           </Alert>
         )}
 
+        <Stepper activeStep={activeStep} sx={{ mb: 4 }}>
+          <Step>
+            <StepLabel>Personal Information</StepLabel>
+          </Step>
+          <Step>
+            <StepLabel>Event Details</StepLabel>
+          </Step>
+          <Step>
+            <StepLabel>Payment</StepLabel>
+          </Step>
+        </Stepper>
+
         <form onSubmit={handleSubmit}>
           {getStepContent(activeStep)}
           
-          <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 3 }}>
-            {activeStep !== 0 && (
-              <Button onClick={handleBack} sx={{ mr: 1 }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 3 }}>
+            <Button
+              disabled={activeStep === 0}
+              onClick={handleBack}
+            >
                 Back
               </Button>
-            )}
-            {activeStep === steps.length - 1 ? (
+            <Box>
+              {activeStep === 2 ? (
               <Button
                 variant="contained"
                 color="primary"
                 type="submit"
-                disabled={!formData.payment.agreed}
+                  disabled={!formData.payment.agreed || loading}
               >
-                Submit Registration
+                  {loading ? 'Processing...' : 'Submit Registration'}
               </Button>
             ) : (
               <Button
                 variant="contained"
+                  color="primary"
                 onClick={handleNext}
               >
                 Next
               </Button>
             )}
+            </Box>
           </Box>
         </form>
       </Paper>

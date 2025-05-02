@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import {
-  Box,
   Container,
   Typography,
   Grid,
@@ -8,173 +7,160 @@ import {
   CardContent,
   CardMedia,
   Button,
+  Box,
+  Paper,
+  Chip,
   useTheme,
   useMediaQuery,
 } from '@mui/material';
-import { motion, AnimatePresence } from 'framer-motion';
-import axios from 'axios';
+import { motion } from 'framer-motion';
+import { Code, Schedule, LocationOn, AttachMoney, Group } from '@mui/icons-material';
 
 const Hackathons = () => {
-  const [hackathons, setHackathons] = useState([]);
-  const [currentHackathon, setCurrentHackathon] = useState(0);
-  const [loading, setLoading] = useState(true);
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+  const [activeIndex, setActiveIndex] = useState(0);
 
-  useEffect(() => {
-    const fetchHackathons = async () => {
-      try {
-        const response = await axios.get('http://localhost:8000/hackathons');
-        setHackathons(response.data);
-        setLoading(false);
-      } catch (error) {
-        console.error('Error fetching hackathons:', error);
-        setLoading(false);
+  // Sample data - Replace with actual hackathon data
+  const hackathons = [
+    {
+      id: 1,
+      title: "FRCRCE Hackathon 2024",
+      description: "Join us for the biggest hackathon of the year! Build innovative solutions and win exciting prizes.",
+      date: "2024-04-15",
+      location: "FRCRCE Campus",
+      registration_fee: "Free",
+      team_size: "2-4 members",
+      image: "/images/hackathon1.jpg",
+      tracks: ["Web Development", "AI/ML", "Blockchain", "IoT"],
+      prizes: ["₹50,000", "₹30,000", "₹20,000"],
+      contact: {
+        email: "hackathon@frcrce.ac.in",
+        phone: "+91 9876543210"
       }
-    };
-
-    fetchHackathons();
-  }, []);
+    },
+    // Add more hackathons here
+  ];
 
   useEffect(() => {
-    if (hackathons.length > 0) {
-      const interval = setInterval(() => {
-        setCurrentHackathon((prev) => (prev + 1) % hackathons.length);
-      }, 5000);
-      return () => clearInterval(interval);
-    }
-  }, [hackathons]);
+    const interval = setInterval(() => {
+      setActiveIndex((prevIndex) => (prevIndex + 1) % hackathons.length);
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [hackathons.length]);
 
-  if (loading) {
-    return (
-      <Box display="flex" justifyContent="center" alignItems="center" minHeight="80vh">
-        <motion.div
-          animate={{ rotate: 360 }}
-          transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
-          style={{
-            width: 50,
-            height: 50,
-            border: '4px solid #2196F3',
-            borderTopColor: 'transparent',
-            borderRadius: '50%',
-          }}
-        />
-      </Box>
-    );
-  }
+  const formatDate = (dateString) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    });
+  };
 
   return (
-    <Container maxWidth="lg" sx={{ py: 8 }}>
-      <Typography
-        variant="h2"
-        component="h1"
-        align="center"
-        gutterBottom
-        sx={{
-          fontWeight: 700,
-          background: 'linear-gradient(45deg, #2196F3 30%, #21CBF3 90%)',
-          WebkitBackgroundClip: 'text',
-          WebkitTextFillColor: 'transparent',
-          mb: 6,
-        }}
-      >
+    <Container maxWidth="lg" sx={{ py: 4 }}>
+      <Typography variant="h3" component="h1" gutterBottom align="center" sx={{ mb: 4 }}>
         Upcoming Hackathons
       </Typography>
 
-      <Box sx={{ position: 'relative', minHeight: '400px', mb: 6 }}>
-        <AnimatePresence mode="wait">
-          {hackathons.length > 0 && (
-            <motion.div
-              key={currentHackathon}
-              initial={{ opacity: 0, x: 100 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -100 }}
-              transition={{ duration: 0.5 }}
-            >
-              <Card
-                sx={{
-                  borderRadius: '20px',
-                  overflow: 'hidden',
-                  boxShadow: '0 8px 32px rgba(0,0,0,0.1)',
-                }}
-              >
-                <Grid container>
-                  <Grid item xs={12} md={6}>
-                    <CardMedia
-                      component="img"
-                      height="400"
-                      image={hackathons[currentHackathon].image_url}
-                      alt={hackathons[currentHackathon].title}
-                      sx={{ objectFit: 'cover' }}
-                    />
-                  </Grid>
-                  <Grid item xs={12} md={6}>
-                    <CardContent sx={{ p: 4, height: '100%', display: 'flex', flexDirection: 'column' }}>
-                      <Typography variant="h4" component="h2" gutterBottom sx={{ fontWeight: 600 }}>
-                        {hackathons[currentHackathon].title}
-                      </Typography>
-                      <Typography variant="body1" color="text.secondary" paragraph>
-                        {hackathons[currentHackathon].description}
-                      </Typography>
-                      <Box sx={{ mt: 'auto', pt: 2 }}>
-                        <Button
-                          variant="contained"
-                          size="large"
-                          href={`/events/${hackathons[currentHackathon].id}`}
-                          sx={{
-                            borderRadius: '12px',
-                            background: 'linear-gradient(45deg, #2196F3 30%, #21CBF3 90%)',
-                            '&:hover': {
-                              background: 'linear-gradient(45deg, #1976D2 30%, #1E88E5 90%)',
-                            },
-                          }}
-                        >
-                          Learn More
-                        </Button>
-                      </Box>
-                    </CardContent>
-                  </Grid>
-                </Grid>
-              </Card>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </Box>
-
       <Grid container spacing={4}>
         {hackathons.map((hackathon, index) => (
-          <Grid item key={hackathon.id} xs={12} sm={6} md={4}>
+          <Grid item xs={12} key={hackathon.id}>
             <motion.div
-              whileHover={{ y: -10 }}
-              transition={{ duration: 0.3 }}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ 
+                opacity: index === activeIndex ? 1 : 0.5,
+                y: index === activeIndex ? 0 : 20,
+                scale: index === activeIndex ? 1 : 0.95
+              }}
+              transition={{ duration: 0.5 }}
+              style={{ cursor: 'pointer' }}
+              onClick={() => setActiveIndex(index)}
             >
-              <Card
-                sx={{
+              <Card 
+                sx={{ 
                   height: '100%',
-                  borderRadius: '16px',
-                  overflow: 'hidden',
-                  boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
-                  cursor: 'pointer',
+                  display: 'flex',
+                  flexDirection: isMobile ? 'column' : 'row',
+                  transition: 'transform 0.3s ease-in-out',
                   '&:hover': {
-                    boxShadow: '0 8px 30px rgba(0,0,0,0.2)',
+                    transform: 'scale(1.02)',
                   },
                 }}
-                onClick={() => setCurrentHackathon(index)}
               >
                 <CardMedia
                   component="img"
-                  height="200"
-                  image={hackathon.image_url}
+                  sx={{ 
+                    width: isMobile ? '100%' : '40%',
+                    height: isMobile ? 200 : 'auto',
+                    objectFit: 'cover'
+                  }}
+                  image={hackathon.image}
                   alt={hackathon.title}
-                  sx={{ objectFit: 'cover' }}
                 />
-                <CardContent>
-                  <Typography variant="h6" component="h3" gutterBottom>
+                <CardContent sx={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+                  <Typography variant="h4" component="h2" gutterBottom>
                     {hackathon.title}
                   </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    {hackathon.date}
+                  <Typography variant="body1" paragraph>
+                    {hackathon.description}
                   </Typography>
+                  
+                  <Box sx={{ mb: 2 }}>
+                    <Typography variant="h6" gutterBottom>Event Details</Typography>
+                    <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                      <Schedule sx={{ mr: 1 }} />
+                      <Typography>{formatDate(hackathon.date)}</Typography>
+                    </Box>
+                    <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                      <LocationOn sx={{ mr: 1 }} />
+                      <Typography>{hackathon.location}</Typography>
+                    </Box>
+                    <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                      <AttachMoney sx={{ mr: 1 }} />
+                      <Typography>{hackathon.registration_fee}</Typography>
+                    </Box>
+                    <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                      <Group sx={{ mr: 1 }} />
+                      <Typography>Team Size: {hackathon.team_size}</Typography>
+                    </Box>
+                  </Box>
+
+                  <Box sx={{ mb: 2 }}>
+                    <Typography variant="h6" gutterBottom>Tracks</Typography>
+                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                      {hackathon.tracks.map((track, i) => (
+                        <Chip key={i} label={track} color="primary" variant="outlined" />
+                      ))}
+                    </Box>
+                  </Box>
+
+                  <Box sx={{ mb: 2 }}>
+                    <Typography variant="h6" gutterBottom>Prizes</Typography>
+                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                      {hackathon.prizes.map((prize, i) => (
+                        <Chip 
+                          key={i} 
+                          label={prize} 
+                          color={i === 0 ? 'primary' : 'secondary'} 
+                          variant="outlined" 
+                        />
+                      ))}
+                    </Box>
+                  </Box>
+
+                  <Button
+                    variant="contained"
+                    color="primary"
+                    size="large"
+                    fullWidth
+                    sx={{ mt: 'auto' }}
+                    href={`/register/${hackathon.id}`}
+                  >
+                    Register Now
+                  </Button>
                 </CardContent>
               </Card>
             </motion.div>

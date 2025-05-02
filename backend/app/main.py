@@ -12,8 +12,9 @@ from pydantic import BaseModel
 from .database import motor_events_collection, motor_registrations_collection
 from bson import ObjectId, json_util
 import json
+from .routes import event, payment, auth
 
-app = FastAPI()
+app = FastAPI(title="FRCRCE Events API")
 
 # Create and mount static directory for images
 STATIC_DIR = Path(__file__).parent.parent / "static"
@@ -22,14 +23,19 @@ IMAGES_DIR.mkdir(parents=True, exist_ok=True)
 
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
-# Enable CORS
+# Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],  # React frontend URL
+    allow_origins=["*"],  # In production, replace with specific origins
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Include routers
+app.include_router(auth.router)
+app.include_router(event.router)
+app.include_router(payment.router)
 
 class EventCreate(BaseModel):
     title: str
@@ -39,8 +45,8 @@ class EventCreate(BaseModel):
     registration_fee: float
 
 @app.get("/")
-def read_root():
-    return {"message": "Welcome to Event Speciale API"}
+async def root():
+    return {"message": "Welcome to FRCRCE Events API"}
 
 @app.get("/events")
 async def get_events(council: Optional[str] = None):

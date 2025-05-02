@@ -13,7 +13,7 @@ import {
   ListItem,
   ListItemText,
 } from '@mui/material';
-import { Menu as MenuIcon } from '@mui/icons-material';
+import { Menu as MenuIcon, Event, Home, Code } from '@mui/icons-material';
 import { Link as RouterLink } from 'react-router-dom';
 import { useState } from 'react';
 
@@ -27,14 +27,28 @@ const Navbar = () => {
   };
 
   const navItems = [
-    { text: 'Home', path: '/' },
-    { text: 'Events', path: '/events' },
-    { text: 'Hackathons', path: '/hackathons' },
-    { text: 'Clubs', path: '/councils' },
+    { text: 'Home', path: '/', icon: <Home /> },
+    { text: 'Events', path: '/events', icon: <Event /> },
+    { text: 'Hackathons', path: '/hackathons', icon: <Code /> },
   ];
 
   const drawer = (
-    <Box onClick={handleDrawerToggle} sx={{ textAlign: 'center' }}>
+    <Box onClick={handleDrawerToggle} sx={{ textAlign: 'center', py: 2 }}>
+      <Typography
+        variant="h6"
+        component={RouterLink}
+        to="/"
+        sx={{
+          textDecoration: 'none',
+          color: 'primary.main',
+          fontWeight: 700,
+          fontSize: '1.5rem',
+          mb: 2,
+          display: 'block',
+        }}
+      >
+        FRCRCE
+      </Typography>
       <List>
         {navItems.map((item) => (
           <ListItem
@@ -48,6 +62,9 @@ const Navbar = () => {
               },
             }}
           >
+            <Box sx={{ mr: 1, display: 'flex', alignItems: 'center' }}>
+              {item.icon}
+            </Box>
             <ListItemText primary={item.text} />
           </ListItem>
         ))}
@@ -57,33 +74,32 @@ const Navbar = () => {
 
   return (
     <AppBar
-      position="sticky"
+      position="fixed"
       sx={{
-        backgroundColor: 'rgba(255, 255, 255, 0.95)',
-        backdropFilter: 'blur(10px)',
-        boxShadow: '0 2px 10px rgba(0,0,0,0.1)',
+        backgroundColor: 'primary.main',
+        zIndex: (theme) => theme.zIndex.drawer + 1,
       }}
     >
       <Toolbar>
-        <Typography
-          variant="h6"
+          <Typography
+            variant="h6"
           component={RouterLink}
           to="/"
           sx={{
             flexGrow: 1,
             textDecoration: 'none',
-            color: 'primary.main',
+            color: 'white',
             fontWeight: 700,
             fontSize: '1.5rem',
           }}
         >
           FRCRCE
-        </Typography>
+          </Typography>
 
         {isMobile ? (
           <>
             <IconButton
-              color="primary"
+              color="inherit"
               aria-label="open drawer"
               edge="start"
               onClick={handleDrawerToggle}
@@ -100,7 +116,7 @@ const Navbar = () => {
               }}
               sx={{
                 '& .MuiDrawer-paper': {
-                  width: 200,
+                  width: 240,
                   boxSizing: 'border-box',
                 },
               }}
@@ -113,13 +129,14 @@ const Navbar = () => {
             {navItems.map((item) => (
               <Button
                 key={item.text}
+                color="inherit"
                 component={RouterLink}
                 to={item.path}
+                startIcon={item.icon}
                 sx={{
-                  color: 'text.primary',
+                  color: 'white',
                   '&:hover': {
-                    backgroundColor: 'transparent',
-                    color: 'primary.main',
+                    backgroundColor: 'rgba(255, 255, 255, 0.1)',
                   },
                 }}
               >
@@ -128,7 +145,7 @@ const Navbar = () => {
             ))}
           </Box>
         )}
-      </Toolbar>
+        </Toolbar>
     </AppBar>
   );
 };
